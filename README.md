@@ -264,7 +264,7 @@ python test_scenarios.py
 - ❌ `__pycache__/`
 
 **반드시 포함:**
-- ✅ `data/smartstore_faq.json` (FAQ 데이터)
+- ✅ `final_result.pkl` (FAQ 데이터)
 - ✅ `scenarios.json` (테스트 시나리오)
 - ✅ `results/test_report_*.md` (최신 테스트 결과)
 
