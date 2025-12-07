@@ -26,6 +26,13 @@
    - 2단계: 전자상거래 키워드 → LLM 검증
    - 3단계: 무관한 질문 차단
 
+5. **맥락 기반 역질문 (Contextual Questions) ✨ NEW**
+   - 메인 답변 분석하여 사용자 추가 질문 예측
+   - **버튼 클릭 시 즉시 답변 표시** (재입력 불필요!)
+   - 온디맨드 답변 생성 (토큰 50% 절약)
+   - 기존 답변 컨텍스트 재사용 (RAG 재검색 불필요)
+   - Expander UI로 직관적인 UX 제공
+
 ## 🛠️ 기술 스택
 
 **Backend**
@@ -116,6 +123,16 @@ print(response.json())
 {
   "answer": "스마트스토어 가입은...",
   "follow_up_questions": ["질문1", "질문2", "질문3"],
+  "contextual_questions": [
+    {
+      "question": "등록에 필요한 서류 안내해드릴까요?",
+      "answer": ""
+    },
+    {
+      "question": "등록 절차는 얼마나 오래 걸리는지 안내가 필요하신가요?",
+      "answer": ""
+    }
+  ],
   "sources": [
     {
       "category": "스토어개설",
@@ -127,6 +144,31 @@ print(response.json())
   "cached": false
 }
 ```
+
+### 역질문 답변 API ✨ NEW
+```python
+import requests
+
+# 사용자가 역질문 버튼 클릭 시
+response = requests.post("http://localhost:8000/chat/contextual", json={
+    "contextual_question": "법정대리인 동의서 양식 필요하신가요?",
+    "original_query": "미성년자도 등록이 가능함?",
+    "original_answer": "네, 미성년자도 스마트스토어 판매회원 가입이 가능합니다...",
+    "session_id": "user123"
+})
+
+# 응답: 기존 답변에서 정보 추출
+print(response.json())
+# {
+#   "answer": "네, 법정대리인 동의서 양식이 필요합니다. 가입 신청 단계에서...",
+#   "contextual_question": "법정대리인 동의서 양식 필요하신가요?"
+# }
+```
+
+**핵심 특징:**
+- ✅ RAG 재검색 없음 (기존 답변 재사용)
+- ✅ 캐시 저장 (다음 사용자 재사용)
+- ✅ 100자 이내 간결한 답변
 
 ### 통계 조회
 ```bash
@@ -157,6 +199,7 @@ curl -X POST "http://localhost:8000/chat/stream" \
 | GET | `/health` | 헬스 체크 |
 | POST | `/chat` | 채팅 (일반) |
 | POST | `/chat/stream` | **채팅 (스트리밍) ⚡** |
+| POST | `/chat/contextual` | **역질문 답변 생성 ✨ NEW** |
 | GET | `/stats` | 서비스 통계 (RAG + 캐시) |
 | DELETE | `/conversation/{session_id}` | 대화 기록 삭제 |
 
@@ -196,6 +239,52 @@ if "판매" in query or "주문" in query:
 # 3단계: 키워드 없음
 return False  # 차단
 ```
+
+### 4. 맥락 기반 역질문 (Contextual Questions) ✨ NEW
+
+**사용자 시나리오:**
+```
+사용자: "미성년자도 등록이 가능함?"
+챗봇: "네, 미성년자도 스마트스토어 판매회원 가입이 가능합니다..."
+
+[역질문 버튼 2개 표시]
+🔹 법정대리인 동의서 양식 필요하신가요?
+🔹 가족관계증명서 발급 방법 안내해드릴까요?
+
+[사용자가 첫 번째 버튼 클릭]
+→ 즉시 Expander 펼쳐지며 답변 표시! (재입력 불필요)
+
+📖 법정대리인 동의서 양식 필요하신가요?
+   "네, 법정대리인 동의서 양식이 필요합니다. 가입 신청 단계에서..."
+```
+
+**구현 방식:**
+```python
+# 1단계: 메인 답변 생성 시 역질문만 생성 (답변 X)
+contextual_questions = generate_contextual_questions(answer)
+# → ["법정대리인 동의서 양식 필요하신가요?", ...]
+# 토큰: 150 (답변 없음, 50% 절감!)
+
+# 2단계: 사용자가 버튼 클릭 → API 호출 (온디맨드)
+if user_clicks(contextual_question):
+    # 기존 main answer에서 정보 추출 (RAG 재검색 X)
+    answer = extract_from_main_answer(
+        original_answer=main_answer,
+        question=contextual_question
+    )
+    # Streamlit Expander로 즉시 표시
+    with st.expander(contextual_question, expanded=True):
+        st.markdown(answer)
+
+# 3단계: 역질문 답변도 캐시에 저장 (다음 사용자 재사용)
+cache.save(contextual_question, answer)
+```
+
+**비용 최적화 전략:**
+- Before: 역질문 답변 미리 생성 → 300 토큰 (2개 × 150)
+- After: 클릭 시에만 생성 → 150 토큰 (클릭 1개당)
+- 기존 답변 재사용 → RAG 재검색 불필요
+- **실제 절감**: 사용자가 역질문 클릭 안 하면 → 100% 토큰 절감!
 
 ## 📁 프로젝트 구조
 

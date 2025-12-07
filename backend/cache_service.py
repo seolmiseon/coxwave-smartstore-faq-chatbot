@@ -125,6 +125,7 @@ class QueryCacheService:
                         "original_query": metadata["query"],
                         "timestamp": metadata.get("timestamp", ""),
                         "follow_up_questions": json.loads(metadata.get("follow_ups", "[]")),
+                        "contextual_questions": json.loads(metadata.get("contextual_questions", "[]")),  # 역질문 추가
                         "sources": json.loads(metadata.get("sources", "[]"))
                     }
                 else:
@@ -142,6 +143,7 @@ class QueryCacheService:
         query: str,
         answer: str,
         follow_up_questions: List[str],
+        contextual_questions: List[str],
         sources: List[Dict[str, Any]]
     ):
         """
@@ -151,6 +153,7 @@ class QueryCacheService:
             query: 사용자 질문
             answer: LLM 응답
             follow_up_questions: 후속 질문 리스트
+            contextual_questions: 맥락 역질문 리스트
             sources: 참고 문서 리스트
         """
         try:
@@ -175,6 +178,7 @@ class QueryCacheService:
                     "query": query,
                     "answer": answer,
                     "follow_ups": json.dumps(follow_up_questions, ensure_ascii=False),
+                    "contextual_questions": json.dumps(contextual_questions, ensure_ascii=False),  # 역질문 저장
                     "sources": json.dumps(sources, ensure_ascii=False),
                     "timestamp": datetime.now().isoformat()
                 }]

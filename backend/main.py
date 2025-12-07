@@ -62,6 +62,24 @@ class ChatRequest(BaseModel):
         }
 
 
+class ContextualQuestionRequest(BaseModel):
+    """역질문 답변 요청 모델"""
+    contextual_question: str = Field(..., description="역질문", min_length=1, max_length=200)
+    original_query: str = Field(..., description="원래 사용자 질문", min_length=1)
+    original_answer: str = Field(..., description="원래 답변", min_length=1)
+    session_id: Optional[str] = Field(default="default", description="세션 ID")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "contextual_question": "법정대리인 동의서 양식 필요하신가요?",
+                "original_query": "미성년자도 등록이 가능함?",
+                "original_answer": "네, 미성년자도 스마트스토어에 등록할 수 있습니다...",
+                "session_id": "user_123"
+            }
+        }
+
+
 class SourceDocument(BaseModel):
     """참고 문서 모델"""
     category: str = Field(..., description="카테고리")
@@ -69,10 +87,17 @@ class SourceDocument(BaseModel):
     similarity: float = Field(..., description="유사도 점수")
 
 
+class ContextualQuestion(BaseModel):
+    """맥락 기반 역질문 모델"""
+    question: str = Field(..., description="역질문")
+    answer: str = Field(..., description="역질문에 대한 답변")
+
+
 class ChatResponse(BaseModel):
     """채팅 응답 모델"""
     answer: str = Field(..., description="챗봇 답변")
-    follow_up_questions: List[str] = Field(..., description="후속 질문 목록")
+    follow_up_questions: List[str] = Field(..., description="후속 질문 목록 (추천)")
+    contextual_questions: List[ContextualQuestion] = Field(default=[], description="맥락 기반 역질문 목록")
     sources: List[SourceDocument] = Field(..., description="참고 문서 목록")
     is_smartstore_related: bool = Field(..., description="스마트스토어 관련 질문 여부")
     session_id: str = Field(..., description="세션 ID")
@@ -85,6 +110,10 @@ class ChatResponse(BaseModel):
                     "가입에 필요한 서류는 무엇인가요?",
                     "사업자등록증이 없어도 가입할 수 있나요?",
                     "가입 후 첫 상품 등록은 어떻게 하나요?"
+                ],
+                "contextual_questions": [
+                    "등록에 필요한 서류 안내해드릴까요?",
+                    "등록 절차는 얼마나 오래 걸리는지 안내가 필요하신가요?"
                 ],
                 "sources": [
                     {
@@ -195,6 +224,10 @@ async def chat(request: ChatRequest):
         return ChatResponse(
             answer=result["answer"],
             follow_up_questions=result["follow_up_questions"],
+            contextual_questions=[
+                ContextualQuestion(**cq) if isinstance(cq, dict) else ContextualQuestion(question=cq, answer="")
+                for cq in result.get("contextual_questions", [])
+            ],
             sources=[
                 SourceDocument(**source) for source in result["sources"]
             ],
@@ -248,6 +281,39 @@ async def chat_stream(request: ChatRequest):
             "Connection": "keep-alive",
         }
     )
+
+
+@app.post("/chat/contextual")
+async def answer_contextual_question(request: ContextualQuestionRequest):
+    """
+    역질문 답변 생성 (클릭 시 호출)
+
+    - **contextual_question**: 역질문
+    - **original_query**: 원래 사용자 질문
+    - **original_answer**: 원래 답변
+    - **session_id**: 세션 ID
+
+    Returns: 역질문에 대한 답변
+    """
+    if chatbot_service is None:
+        raise HTTPException(status_code=503, detail="서비스가 초기화되지 않았습니다")
+
+    try:
+        answer = chatbot_service.answer_contextual_question(
+            contextual_question=request.contextual_question,
+            original_query=request.original_query,
+            original_answer=request.original_answer,
+            session_id=request.session_id
+        )
+
+        return {
+            "answer": answer,
+            "contextual_question": request.contextual_question
+        }
+
+    except Exception as e:
+        logger.error(f"역질문 답변 생성 오류: {e}")
+        raise HTTPException(status_code=500, detail=f"역질문 답변 생성 실패: {str(e)}")
 
 
 @app.get("/conversation/{session_id}", response_model=ConversationHistoryResponse)

@@ -85,6 +85,9 @@ if "messages" not in st.session_state:
 if "total_queries" not in st.session_state:
     st.session_state.total_queries = 0
 
+if "pending_question" not in st.session_state:
+    st.session_state.pending_question = None
+
 # 채팅 히스토리 표시
 for message in st.session_state.messages:
     # 아바타 설정: 사용자는 쇼핑카트, 봇은 네이버 톡톡 로고
@@ -107,7 +110,16 @@ for message in st.session_state.messages:
                 st.caption(f"  • {fq}")
 
 # 채팅 입력
-if prompt := st.chat_input("질문을 입력하세요"):
+# pending_question이 있으면 먼저 처리
+if st.session_state.pending_question:
+    prompt = st.session_state.pending_question
+    st.session_state.pending_question = None  # 초기화
+elif prompt := st.chat_input("질문을 입력하세요"):
+    pass  # prompt는 이미 설정됨
+else:
+    prompt = None
+
+if prompt:
     # 사용자 메시지 추가
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
@@ -158,7 +170,7 @@ if prompt := st.chat_input("질문을 입력하세요"):
                     # 최종 답변 (커서 제거)
                     message_placeholder.markdown(full_answer)
 
-                    # 일반 응답으로 후속 질문/참고 문서 가져오기
+                    # 일반 응답으로 후속 질문/역질문/참고 문서 가져오기
                     detail_response = requests.post(
                         f"{api_url}/chat",
                         json=payload,
@@ -167,9 +179,28 @@ if prompt := st.chat_input("질문을 입력하세요"):
                     if detail_response.status_code == 200:
                         data = detail_response.json()
                         follow_ups = data.get("follow_up_questions", [])
+                        contextual_questions = data.get("contextual_questions", [])  # 역질문
                         sources = data.get("sources", [])
+
+                        # 역질문 표시 (답변 바로 뒤 - 클릭하면 답변 펼치기)
+                        if contextual_questions:
+                            st.markdown("---")
+                            for idx, cq_data in enumerate(contextual_questions):
+                                cq_question = cq_data.get("question", cq_data) if isinstance(cq_data, dict) else cq_data
+                                cq_answer = cq_data.get("answer", "") if isinstance(cq_data, dict) else ""
+
+                                if cq_answer:
+                                    # 답변이 있으면 expander로 표시
+                                    with st.expander(f"💬 {cq_question}"):
+                                        st.markdown(cq_answer)
+                                else:
+                                    # 답변이 없으면 기존 방식 (버튼)
+                                    if st.button(cq_question, key=f"stream_contextual_{idx}_{len(st.session_state.messages)}"):
+                                        st.session_state.pending_question = cq_question
+                                        st.rerun()
                     else:
                         follow_ups = []
+                        contextual_questions = []
                         sources = []
 
                     answer = full_answer
@@ -195,11 +226,56 @@ if prompt := st.chat_input("질문을 입력하세요"):
                     data = response.json()
                     answer = data.get("answer", "응답을 받지 못했습니다.")
                     follow_ups = data.get("follow_up_questions", [])
+                    contextual_questions = data.get("contextual_questions", [])  # 역질문 추가
                     sources = data.get("sources", [])
                     is_related = data.get("is_smartstore_related", True)
 
                     # 응답 표시
                     message_placeholder.markdown(answer)
+
+                    # 역질문 표시 (클릭 시 답변 생성)
+                    if contextual_questions:
+                        st.markdown("---")
+                        st.markdown("**💬 추가로 궁금하신 내용**")
+
+                        # 세션에 역질문 답변 캐시 저장
+                        if "contextual_answers" not in st.session_state:
+                            st.session_state.contextual_answers = {}
+
+                        for idx, cq in enumerate(contextual_questions):
+                            cq_question = cq if isinstance(cq, str) else cq.get("question", "")
+                            button_key = f"contextual_{idx}_{len(st.session_state.messages)}"
+
+                            # 버튼 클릭 시 답변 생성
+                            if st.button(f"🔹 {cq_question}", key=button_key):
+                                # API 호출하여 답변 생성
+                                try:
+                                    cq_response = requests.post(
+                                        f"{api_url}/chat/contextual",
+                                        json={
+                                            "contextual_question": cq_question,
+                                            "original_query": prompt,
+                                            "original_answer": answer,
+                                            "session_id": session_id
+                                        },
+                                        timeout=15
+                                    )
+
+                                    if cq_response.status_code == 200:
+                                        cq_answer = cq_response.json().get("answer", "")
+                                        # 세션에 저장
+                                        st.session_state.contextual_answers[button_key] = cq_answer
+                                        st.rerun()
+                                    else:
+                                        st.error(f"역질문 답변 생성 실패: {cq_response.status_code}")
+
+                                except Exception as e:
+                                    st.error(f"역질문 처리 오류: {str(e)}")
+
+                            # 이미 답변이 있으면 expander로 표시
+                            if button_key in st.session_state.contextual_answers:
+                                with st.expander(f"📖 {cq_question}", expanded=True):
+                                    st.markdown(st.session_state.contextual_answers[button_key])
 
                 else:
                     error_msg = f"API 오류: {response.status_code}"

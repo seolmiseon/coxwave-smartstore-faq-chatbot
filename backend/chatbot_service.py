@@ -158,17 +158,18 @@ class ChatbotService:
             prompt = f"""다음 질문이 '네이버 스마트스토어 판매자'와 관련된 질문인지 판단하세요.
 
 스마트스토어 판매자 관련 주제:
-- 스토어 개설/가입
+- 스토어 개설/가입/등록 (연령, 자격, 서류 등)
 - 상품 등록/관리
 - 주문/배송 처리
 - 결제/정산
 - 환불/교환/취소 처리
 - 고객 문의/리뷰 관리
 - 판매 전략/마케팅
+- 판매자 자격 요건 (미성년자, 사업자 등)
 
 질문: {query}
 
-위 질문이 스마트스토어 판매자와 관련되면 'YES', 아니면 'NO'만 답하세요."""
+위 질문이 위 주제 중 하나와 관련되면 'YES', 완전히 무관하면 'NO'만 답하세요."""
 
             # OpenAI 또는 Solar 사용 (둘 다 저렴)
             if hasattr(self, 'openai'):
@@ -231,9 +232,9 @@ class ChatbotService:
         search_results: List[Dict[str, Any]]
     ) -> List[str]:
         """
-        후속 질문 생성
+        후속 질문 생성 (LLM 기반 - 하이브리드 전략)
 
-        사용자가 추가로 궁금해할 만한 질문 3개 생성
+        검색 결과 카테고리를 기반으로 관련 질문 3개 생성
 
         Args:
             query: 원래 질문
@@ -244,40 +245,192 @@ class ChatbotService:
             후속 질문 리스트 (최대 3개)
         """
         # 검색 결과에서 관련 카테고리 추출
-        categories = set()
-        for result in search_results[:5]:
+        categories = []
+        for result in search_results[:3]:
             if "metadata" in result and "category" in result["metadata"]:
                 cat = result["metadata"]["category"]
                 if cat != "기타":
-                    categories.add(cat)
+                    categories.append(cat)
 
-        # 카테고리 기반 후속 질문 생성
-        follow_ups = []
+        if not categories:
+            categories = ["스마트스토어 일반"]
 
-        category_questions = {
-            "가입절차": "스마트스토어 가입 시 필요한 서류는 무엇인가요?",
-            "가입서류": "사업자등록증이 없어도 가입할 수 있나요?",
-            "스마트스토어": "스마트스토어와 스마트플레이스의 차이는 무엇인가요?",
-            "상품등록": "상품 등록은 어떻게 하나요?",
-            "주문관리": "주문 취소는 어떻게 처리하나요?",
-            "정산": "정산은 언제 이루어지나요?",
-            "배송": "배송비는 어떻게 설정하나요?",
-        }
+        categories_str = ", ".join(set(categories))
 
-        for cat in list(categories)[:3]:
-            if cat in category_questions:
-                follow_ups.append(category_questions[cat])
+        # LLM으로 후속 질문 생성
+        prompt = f"""스마트스토어 FAQ 챗봇입니다. 사용자가 추가로 궁금해할 만한 관련 질문 3개를 생성하세요.
 
-        # 부족하면 일반 질문 추가
-        if len(follow_ups) < 3:
-            general_questions = [
-                "스마트스토어 수수료는 얼마인가요?",
-                "상품 등록은 몇 개까지 가능한가요?",
-                "고객 문의는 어떻게 관리하나요?"
-            ]
-            follow_ups.extend(general_questions[:3 - len(follow_ups)])
+사용자 질문: {query}
+관련 카테고리: {categories_str}
 
-        return follow_ups[:3]
+규칙:
+1. 위 카테고리와 관련된 실용적인 질문
+2. 사용자가 다음 단계로 궁금해할 내용
+3. 간결하고 명확한 질문 (15자 이내)
+
+질문 3개를 줄바꿈으로 구분해서 작성하세요:"""
+
+        try:
+            if hasattr(self, 'openai'):
+                response = self.openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.7
+                )
+                result = response.choices[0].message.content.strip()
+            else:
+                result = self.solar_service.generate_chat_response(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=150
+                ).strip()
+
+            # 줄바꿈으로 분리 후 정제
+            questions = [q.strip().lstrip('123.-•') for q in result.split('\n') if q.strip()]
+            return questions[:3]
+
+        except Exception as e:
+            logger.error(f"후속 질문 생성 실패: {e}")
+            # 폴백: 검색 결과에서 다른 질문 추출
+            fallback = []
+            for result in search_results[:3]:
+                if "metadata" in result and "clean_question" in result["metadata"]:
+                    fallback.append(result["metadata"]["clean_question"])
+
+            # 검색 결과도 없으면 빈 리스트 반환
+            return fallback[:3] if fallback else []
+
+
+    def _generate_contextual_questions(self, query: str, answer: str, search_results: List[Dict[str, Any]]) -> List[str]:
+        """
+        맥락 기반 역질문 생성 (질문만! 답변은 클릭 시 생성)
+
+        답변 내용을 분석하여 사용자가 추가로 궁금해할 만한 역질문 2개를 생성
+
+        Args:
+            query: 사용자 질문
+            answer: 생성된 답변
+            search_results: 검색 결과
+
+        Returns:
+            역질문 리스트 (최대 2개)
+        """
+        # LLM으로 역질문만 생성 (답변은 나중에 클릭 시!)
+        prompt = f"""스마트스토어 FAQ 챗봇입니다. 사용자 질문에 대한 답변이 제공되었습니다.
+답변 내용을 분석하여 사용자가 다음으로 궁금해할 만한 역질문 2개를 생성하세요.
+
+사용자 질문: {query}
+챗봇 답변: {answer}
+
+역질문 규칙:
+1. 답변 내용과 직접 연관된 후속 질문
+2. "~안내해드릴까요?", "~알려드릴까요?", "~필요하신가요?" 형식 사용
+3. 구체적이고 실용적인 질문 (20자 이내)
+
+질문 2개를 줄바꿈으로 구분해서 작성하세요:"""
+
+        try:
+            if hasattr(self, 'openai'):
+                response = self.openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=150,
+                    temperature=0.7
+                )
+                result = response.choices[0].message.content.strip()
+            else:
+                result = self.solar_service.generate_chat_response(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=150
+                ).strip()
+
+            # 줄바꿈으로 분리
+            questions = [q.strip() for q in result.split('\n') if q.strip()]
+
+            # 번호 제거 (1. 2. - * 등)
+            import re
+            questions = [re.sub(r'^[\d\-\*\.\)]+\s*', '', q).strip() for q in questions]
+
+            return questions[:2]
+
+        except Exception as e:
+            logger.error(f"역질문 생성 실패: {e}")
+            return []
+
+
+    def answer_contextual_question(
+        self,
+        contextual_question: str,
+        original_query: str,
+        original_answer: str,
+        session_id: str = "default"
+    ) -> str:
+        """
+        역질문에 대한 답변 생성 (기존 main answer에서 추출!)
+
+        사용자가 역질문을 클릭하면, 이미 생성된 main answer에서 정보를 추출하여 답변
+
+        Args:
+            contextual_question: 역질문
+            original_query: 원래 사용자 질문
+            original_answer: 원래 답변 (여기서 정보 추출!)
+            session_id: 세션 ID
+
+        Returns:
+            역질문에 대한 답변
+        """
+        # 캐시에서 먼저 확인
+        cached_result = self.query_cache.search_similar_cache(contextual_question)
+        if cached_result:
+            logger.info(f"🎯 역질문 캐시 히트: {contextual_question[:30]}...")
+            return cached_result["answer"]
+
+        # 캐시 미스: main answer에서 정보 추출
+        prompt = f"""스마트스토어 FAQ 챗봇입니다.
+
+원래 사용자 질문: {original_query}
+원래 답변:
+{original_answer}
+
+사용자가 추가로 궁금해하는 질문: {contextual_question}
+
+**위 원래 답변에 포함된 정보를 바탕으로** 사용자의 추가 질문에 간결하게 답변하세요. (100자 이내)
+새로운 정보를 만들지 말고, 이미 제공한 답변에서 관련 부분만 요약해주세요."""
+
+        try:
+            # LLM 호출
+            if hasattr(self, 'openai'):
+                response = self.openai.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=200,
+                    temperature=0.5
+                )
+                answer = response.choices[0].message.content.strip()
+            else:
+                answer = self.solar_service.generate_chat_response(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.5,
+                    max_tokens=200
+                ).strip()
+
+            # 캐시에 저장 (다음 사용자를 위해!)
+            self.query_cache.save_cache(
+                query=contextual_question,
+                answer=answer,
+                follow_up_questions=[],
+                contextual_questions=[],
+                sources=[]
+            )
+            logger.info(f"💾 역질문 답변 캐시 저장: {contextual_question[:30]}...")
+
+            return answer
+
+        except Exception as e:
+            logger.error(f"역질문 답변 생성 실패: {e}")
+            return "죄송합니다. 답변을 생성할 수 없습니다."
 
 
     def chat(
@@ -311,13 +464,16 @@ class ChatbotService:
         # 1. 도메인 필터링
         is_smartstore = self._is_smartstore_question(query)
         if not is_smartstore:
+            # RAG에서 일반적인 FAQ 질문 3개 추출 (하드코딩 제거)
+            general_faqs = self.rag_service.semantic_search("스마트스토어 가입", top_k=3)
+            suggested_questions = [
+                faq["metadata"]["clean_question"] for faq in general_faqs
+            ] if general_faqs else []
+
             return {
                 "answer": "죄송합니다. 저는 네이버 스마트스토어 관련 질문에만 답변할 수 있습니다. 스마트스토어 관련 질문을 해주시겠어요?",
-                "follow_up_questions": [
-                    "스마트스토어 가입은 어떻게 하나요?",
-                    "스마트스토어 수수료는 얼마인가요?",
-                    "상품 등록은 어떻게 하나요?"
-                ],
+                "follow_up_questions": suggested_questions,
+                "contextual_questions": [],
                 "sources": [],
                 "is_smartstore_related": False,
                 "cached": False
@@ -330,6 +486,7 @@ class ChatbotService:
             return {
                 "answer": cached_result["answer"],
                 "follow_up_questions": cached_result["follow_up_questions"],
+                "contextual_questions": cached_result.get("contextual_questions", []),  # 역질문 (캐시에 있으면)
                 "sources": cached_result["sources"],
                 "is_smartstore_related": True,
                 "cached": True,
@@ -345,13 +502,16 @@ class ChatbotService:
 
         # 검색 결과가 없으면 기본 답변
         if not search_results:
+            # 일반 FAQ에서 추천 질문 추출 (하드코딩 제거)
+            fallback_faqs = self.rag_service.semantic_search("스마트스토어", top_k=3)
+            fallback_questions = [
+                faq["metadata"]["clean_question"] for faq in fallback_faqs
+            ] if fallback_faqs else []
+
             return {
                 "answer": "죄송합니다. 관련된 정보를 찾을 수 없습니다. 다른 질문을 해주시겠어요?",
-                "follow_up_questions": [
-                    "스마트스토어 가입은 어떻게 하나요?",
-                    "상품 등록 방법을 알려주세요",
-                    "주문 관리는 어떻게 하나요?"
-                ],
+                "follow_up_questions": fallback_questions,
+                "contextual_questions": [],
                 "sources": [],
                 "is_smartstore_related": True,
                 "cached": False
@@ -404,10 +564,13 @@ class ChatbotService:
             )
             answer = response.choices[0].message.content
 
-        # 8. 후속 질문 생성
+        # 8. 후속 질문 생성 (LLM 기반 - 카테고리 참고)
         follow_ups = self._generate_follow_up_questions(query, answer, search_results)
 
-        # 9. 참고 문서 정리
+        # 9. 맥락 기반 역질문 + 답변 생성 (LLM 기반 - 답변 내용 참고)
+        contextual_questions = self._generate_contextual_questions(query, answer, search_results)
+
+        # 10. 참고 문서 정리
         sources = [
             {
                 "category": doc["metadata"]["category"],
@@ -417,11 +580,12 @@ class ChatbotService:
             for doc in search_results[:3]
         ]
 
-        # 10. 쿼리 캐시에 저장 (다음 사용자를 위해!)
+        # 11. 쿼리 캐시에 저장 (다음 사용자를 위해!)
         self.query_cache.save_cache(
             query=query,
             answer=answer,
             follow_up_questions=follow_ups,
+            contextual_questions=contextual_questions,
             sources=sources
         )
 
@@ -444,6 +608,7 @@ class ChatbotService:
         return {
             "answer": answer,
             "follow_up_questions": follow_ups,
+            "contextual_questions": contextual_questions,  # 역질문 추가!
             "sources": sources,
             "is_smartstore_related": True,
             "cached": False  # 새로 생성한 답변
