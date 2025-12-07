@@ -1,0 +1,184 @@
+{
+  "scenarios": [
+    {
+      "id": 1,
+      "category": "가입/시작",
+      "query": "스마트스토어 가입은 어떻게 하나요?",
+      "expected_keywords": ["가입", "회원가입", "네이버", "커머스"]
+    },
+    {
+      "id": 2,
+      "category": "가입/시작",
+      "query": "사업자등록증이 없어도 스토어를 열 수 있나요?",
+      "expected_keywords": ["사업자", "등록", "개인"]
+    },
+    {
+      "id": 3,
+      "category": "가입/시작",
+      "query": "스토어 개설에 필요한 서류가 뭔가요?",
+      "expected_keywords": ["서류", "개설", "준비"]
+    },
+    {
+      "id": 4,
+      "category": "가입/시작",
+      "query": "가입 승인은 얼마나 걸리나요?",
+      "expected_keywords": ["승인", "심사", "기간"]
+    },
+    {
+      "id": 5,
+      "category": "가입/시작",
+      "query": "미성년자도 스마트스토어를 운영할 수 있나요?",
+      "expected_keywords": ["나이", "미성년", "자격"]
+    },
+    {
+      "id": 6,
+      "category": "상품관리",
+      "query": "상품은 어떻게 등록하나요?",
+      "expected_keywords": ["상품", "등록", "추가"]
+    },
+    {
+      "id": 7,
+      "category": "상품관리",
+      "query": "한 번에 여러 상품을 등록하는 방법이 있나요?",
+      "expected_keywords": ["대량", "일괄", "엑셀"]
+    },
+    {
+      "id": 8,
+      "category": "상품관리",
+      "query": "상품 카테고리는 어떻게 설정하나요?",
+      "expected_keywords": ["카테고리", "분류", "설정"]
+    },
+    {
+      "id": 9,
+      "category": "상품관리",
+      "query": "상품 이미지 규격은 어떻게 되나요?",
+      "expected_keywords": ["이미지", "사진", "크기", "해상도"]
+    },
+    {
+      "id": 10,
+      "category": "상품관리",
+      "query": "등록한 상품을 수정하려면 어떻게 하나요?",
+      "expected_keywords": ["수정", "변경", "편집"]
+    },
+    {
+      "id": 11,
+      "category": "상품관리",
+      "query": "품절된 상품은 어떻게 관리하나요?",
+      "expected_keywords": ["품절", "재고", "관리"]
+    },
+    {
+      "id": 12,
+      "category": "상품관리",
+      "query": "상품 가격을 변경하면 바로 반영되나요?",
+      "expected_keywords": ["가격", "변경", "반영"]
+    },
+    {
+      "id": 13,
+      "category": "상품관리",
+      "query": "상품 옵션(색상, 사이즈)은 어떻게 추가하나요?",
+      "expected_keywords": ["옵션", "색상", "사이즈"]
+    },
+    {
+      "id": 14,
+      "category": "주문/배송",
+      "query": "주문이 들어오면 어떻게 확인하나요?",
+      "expected_keywords": ["주문", "확인", "알림"]
+    },
+    {
+      "id": 15,
+      "category": "주문/배송",
+      "query": "배송비는 어떻게 설정하나요?",
+      "expected_keywords": ["배송비", "설정", "무료배송"]
+    },
+    {
+      "id": 16,
+      "category": "주문/배송",
+      "query": "택배사는 어떻게 선택하나요?",
+      "expected_keywords": ["택배", "배송", "업체"]
+    },
+    {
+      "id": 17,
+      "category": "주문/배송",
+      "query": "송장번호는 어떻게 입력하나요?",
+      "expected_keywords": ["송장", "번호", "입력"]
+    },
+    {
+      "id": 18,
+      "category": "주문/배송",
+      "query": "고객이 주문을 취소하면 어떻게 하나요?",
+      "expected_keywords": ["취소", "주문취소", "처리"]
+    },
+    {
+      "id": 19,
+      "category": "주문/배송",
+      "query": "환불 절차는 어떻게 되나요?",
+      "expected_keywords": ["환불", "반품", "절차"]
+    },
+    {
+      "id": 20,
+      "category": "주문/배송",
+      "query": "교환 요청은 어떻게 처리하나요?",
+      "expected_keywords": ["교환", "처리", "절차"]
+    },
+    {
+      "id": 21,
+      "category": "정산/수수료",
+      "query": "정산은 언제 받을 수 있나요?",
+      "expected_keywords": ["정산", "주기", "일정"]
+    },
+    {
+      "id": 22,
+      "category": "정산/수수료",
+      "query": "스마트스토어 판매 수수료는 얼마인가요?",
+      "expected_keywords": ["수수료", "판매", "요율"]
+    },
+    {
+      "id": 23,
+      "category": "정산/수수료",
+      "query": "정산금은 어느 계좌로 입금되나요?",
+      "expected_keywords": ["계좌", "입금", "정산금"]
+    },
+    {
+      "id": 24,
+      "category": "정산/수수료",
+      "query": "세금계산서는 어떻게 발행하나요?",
+      "expected_keywords": ["세금계산서", "발행", "신고"]
+    },
+    {
+      "id": 25,
+      "category": "정산/수수료",
+      "query": "정산 내역은 어디서 확인하나요?",
+      "expected_keywords": ["정산", "내역", "조회"]
+    },
+    {
+      "id": 26,
+      "category": "고객응대",
+      "query": "고객 리뷰는 어떻게 관리하나요?",
+      "expected_keywords": ["리뷰", "후기", "관리"]
+    },
+    {
+      "id": 27,
+      "category": "고객응대",
+      "query": "고객 문의는 어디서 확인하나요?",
+      "expected_keywords": ["문의", "질문", "확인"]
+    },
+    {
+      "id": 28,
+      "category": "고객응대",
+      "query": "악성 리뷰는 삭제할 수 있나요?",
+      "expected_keywords": ["리뷰", "삭제", "신고"]
+    },
+    {
+      "id": 29,
+      "category": "고객응대",
+      "query": "고객 문의에 자동 답변을 설정할 수 있나요?",
+      "expected_keywords": ["자동응답", "답변", "설정"]
+    },
+    {
+      "id": 30,
+      "category": "고객응대",
+      "query": "스토어 공지사항은 어떻게 작성하나요?",
+      "expected_keywords": ["공지", "작성", "등록"]
+    }
+  ]
+}

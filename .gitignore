@@ -1,0 +1,44 @@
+# 환경 변수 (API 키 보안!)
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# ChromaDB 데이터 (로컬 데이터)
+chroma_db/
+backend/data/chroma_cache/
+
+# FAQ 데이터는 포함 (필수!)
+# final_result.pkl 은 커밋됨
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# 임시 파일
+*.tmp
+*.bak
+temp/

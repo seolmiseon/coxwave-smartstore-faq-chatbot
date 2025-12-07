@@ -1,0 +1,32 @@
+# 콕스웨이브 과제용 Python 패키지
+
+# FastAPI 백엔드
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+pydantic>=2.7.4
+
+# 벡터 DB (LangChain 제거 - 직접 구현)
+chromadb>=0.4.22
+
+# OpenAI (Solar Pro도 이 SDK 사용)
+openai>=1.10.0
+
+# 데이터 처리
+pandas==2.1.4
+numpy==1.26.3
+
+# 환경 변수
+python-dotenv==1.0.0
+
+# 로깅
+python-json-logger==2.0.7
+
+# CORS
+python-jose[cryptography]==3.3.0
+
+# Frontend (Streamlit)
+streamlit==1.29.0
+
+# 이미지 처리
+Pillow>=10.0.0
