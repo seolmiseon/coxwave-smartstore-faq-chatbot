@@ -145,7 +145,7 @@ print(response.json())
 }
 ```
 
-### 역질문 답변 API ✨ NEW
+### 역질문 답변 API
 ```python
 import requests
 
@@ -240,7 +240,7 @@ if "판매" in query or "주문" in query:
 return False  # 차단
 ```
 
-### 4. 맥락 기반 역질문 (Contextual Questions) ✨ NEW
+### 4. 맥락 기반 역질문 (Contextual Questions) 
 
 **사용자 시나리오:**
 ```
